@@ -1,177 +1,211 @@
-# STAYFINDR BACKEND - European Hotel Search Engine
-# Flask backend with RapidAPI Booking.com integration
-# ENHANCED: Hotel name-based booking URLs + Room Type Filter + Sort By functionality
-
 import os
-from flask import Flask, request, jsonify, render_template_string
-from flask_cors import CORS
-import requests
 import json
-import time
-from datetime import datetime
+import requests
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
 CORS(app)
 
-# RapidAPI Configuration
-RAPIDAPI_KEY = "e1d84ea6ffmsha47402150e4b4a7p1ad726jsn90c5c8f86999"
-RAPIDAPI_HOST = "booking-com18.p.rapidapi.com"
+# RapidAPI Keys
+HOTELS_RAPIDAPI_KEY = "DIN_API_NYCKEL"
+HOTELS_RAPIDAPI_HOST = "hotels4.p.rapidapi.com"
 
-# European Cities Configuration - 29 major destinations
+# European Cities
 CITIES = {
     'stockholm': {
-        'name': 'Stockholm, Sweden',
+        'name': 'Stockholm',
         'coordinates': [59.3293, 18.0686],
         'search_query': 'Stockholm Sweden'
     },
     'paris': {
-        'name': 'Paris, France', 
+        'name': 'Paris',
         'coordinates': [48.8566, 2.3522],
         'search_query': 'Paris France'
     },
-    'london': {
-        'name': 'London, UK',
-        'coordinates': [51.5074, -0.1278],
-        'search_query': 'London United Kingdom'
-    },
-    'amsterdam': {
-        'name': 'Amsterdam, Netherlands',
-        'coordinates': [52.3676, 4.9041],
-        'search_query': 'Amsterdam Netherlands'
-    },
-    'barcelona': {
-        'name': 'Barcelona, Spain',
-        'coordinates': [41.3851, 2.1734],
-        'search_query': 'Barcelona Spain'
-    },
-    'rome': {
-        'name': 'Rome, Italy',
-        'coordinates': [41.9028, 12.4964],
-        'search_query': 'Rome Italy'
-    },
-    'berlin': {
-        'name': 'Berlin, Germany',
-        'coordinates': [52.5200, 13.4050],
-        'search_query': 'Berlin Germany'
-    },
-    'copenhagen': {
-        'name': 'Copenhagen, Denmark',
-        'coordinates': [55.6761, 12.5683],
-        'search_query': 'Copenhagen Denmark'
-    },
-    'vienna': {
-        'name': 'Vienna, Austria',
-        'coordinates': [48.2082, 16.3738],
-        'search_query': 'Vienna Austria'
-    },
-    'prague': {
-        'name': 'Prague, Czech Republic',
-        'coordinates': [50.0755, 14.4378],
-        'search_query': 'Prague Czech Republic'
-    },
-    'madrid': {
-        'name': 'Madrid, Spain',
-        'coordinates': [40.4168, -3.7038],
-        'search_query': 'Madrid Spain'
-    },
-    'milano': {
-        'name': 'Milano, Italy',
-        'coordinates': [45.4642, 9.1900],
-        'search_query': 'Milano Italy'
-    },
-    'zurich': {
-        'name': 'Zürich, Switzerland',
-        'coordinates': [47.3769, 8.5417],
-        'search_query': 'Zürich Switzerland'
-    },
-    'oslo': {
-        'name': 'Oslo, Norway',
-        'coordinates': [59.9139, 10.7522],
-        'search_query': 'Oslo Norway'
-    },
-    'helsinki': {
-        'name': 'Helsinki, Finland',
-        'coordinates': [60.1695, 24.9354],
-        'search_query': 'Helsinki Finland'
-    },
-    'warsaw': {
-        'name': 'Warsaw, Poland',
-        'coordinates': [52.2297, 21.0122],
-        'search_query': 'Warsaw Poland'
-    },
-    'budapest': {
-        'name': 'Budapest, Hungary',
-        'coordinates': [47.4979, 19.0402],
-        'search_query': 'Budapest Hungary'
-    },
-    'dublin': {
-        'name': 'Dublin, Ireland',
-        'coordinates': [53.3498, -6.2603],
-        'search_query': 'Dublin Ireland'
-    },
-    'lisbon': {
-        'name': 'Lisbon, Portugal',
-        'coordinates': [38.7223, -9.1393],
-        'search_query': 'Lisbon Portugal'
-    },
-    'brussels': {
-        'name': 'Brussels, Belgium',
-        'coordinates': [50.8503, 4.3517],
-        'search_query': 'Brussels Belgium'
-    },
-    'athens': {
-        'name': 'Athens, Greece',
-        'coordinates': [37.9838, 23.7275],
-        'search_query': 'Athens Greece'
-    },
-    'munich': {
-        'name': 'Munich, Germany',
-        'coordinates': [48.1351, 11.5820],
-        'search_query': 'Munich Germany'
-    },
-    'lyon': {
-        'name': 'Lyon, France',
-        'coordinates': [45.7640, 4.8357],
-        'search_query': 'Lyon France'
-    },
-    'florence': {
-        'name': 'Florence, Italy',
-        'coordinates': [43.7696, 11.2558],
-        'search_query': 'Florence Italy'
-    },
-    'edinburgh': {
-        'name': 'Edinburgh, Scotland',
-        'coordinates': [55.9533, -3.1883],
-        'search_query': 'Edinburgh Scotland'
-    },
-    'nice': {
-        'name': 'Nice, France',
-        'coordinates': [43.7102, 7.2620],
-        'search_query': 'Nice France'
-    },
-    'palma': {
-        'name': 'Palma, Spain',
-        'coordinates': [39.5696, 2.6502],
-        'search_query': 'Palma Spain'
-    },
-    'santorini': {
-        'name': 'Santorini, Greece',
-        'coordinates': [36.3932, 25.4615],
-        'search_query': 'Santorini Greece'
-    },
-    'ibiza': {
-        'name': 'Ibiza, Spain',
-        'coordinates': [38.9067, 1.4206],
-        'search_query': 'Ibiza Spain'
-    }
+    # ... Lägg till fler städer vid behov
 }
 
-# Country codes for Booking.com URLs based on city
-COUNTRY_CODES = {
-    'stockholm': 'sv', 'oslo': 'no', 'helsinki': 'fi', 'copenhagen': 'dk',
-    'paris': 'fr', 'lyon': 'fr', 'nice': 'fr',
-    'london': 'en-gb', 'edinburgh': 'en-gb',
-    'amsterdam': 'nl', 'brussels': 'nl',
-    'barcelona': 'es', 'madrid': 'es', 'palma': 'es', 'ibiza': 'es',
-    'rome': 'it
+# ==================== HOTELS.COM API ====================
+
+def get_hotels_destination_id(city_name):
+    url = "https://hotels4.p.rapidapi.com/locations/v3/search"
+    querystring = {"q": city_name, "locale": "en_US"}
+    headers = {
+        "x-rapidapi-key": HOTELS_RAPIDAPI_KEY,
+        "x-rapidapi-host": HOTELS_RAPIDAPI_HOST
+    }
+    try:
+        response = requests.get(url, headers=headers, params=querystring)
+        if response.status_code == 200:
+            data = response.json()
+            for result in data.get('sr', []):
+                if result.get('type') == 'CITY':
+                    return result.get('gaiaId')
+    except Exception as e:
+        print(f"Error getting Hotels.com destination ID: {e}")
+    return None
+
+def search_hotels_hotels_api(destination_id, checkin, checkout, adults, rooms):
+    url = "https://hotels4.p.rapidapi.com/properties/v2/list"
+    payload = {
+        "currency": "EUR",
+        "eapid": 1,
+        "locale": "en_US",
+        "siteId": 300000001,
+        "destination": {"regionId": str(destination_id)},
+        "checkInDate": {
+            "day": int(checkin.split('-')[2]),
+            "month": int(checkin.split('-')[1]),
+            "year": int(checkin.split('-')[0])
+        },
+        "checkOutDate": {
+            "day": int(checkout.split('-')[2]),
+            "month": int(checkout.split('-')[1]),
+            "year": int(checkout.split('-')[0])
+        },
+        "rooms": [{"adults": int(adults), "children": []}],
+        "resultsStartingIndex": 0,
+        "resultsSize": 25,
+        "sort": "PRICE_LOW_TO_HIGH"
+    }
+    headers = {
+        "content-type": "application/json",
+        "x-rapidapi-key": HOTELS_RAPIDAPI_KEY,
+        "x-rapidapi-host": HOTELS_RAPIDAPI_HOST
+    }
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        print(f"Error searching Hotels.com hotels: {e}")
+    return None
+
+def fetch_hotels_com_data(city_info, checkin, checkout, adults, rooms):
+    city_name = city_info.get('name')
+    if not city_name:
+        print("❌ city_info saknar 'name'")
+        return None
+    destination_id = get_hotels_destination_id(city_name)
+    if not destination_id:
+        print(f"❌ Kunde inte hitta destination ID för: {city_name}")
+        return None
+    hotels_response = search_hotels_hotels_api(destination_id, checkin, checkout, adults, rooms)
+    if not hotels_response:
+        print("❌ Hotels.com API svarar inte med data")
+        return None
+    if isinstance(hotels_response, dict) and (
+        'propertySearch' in hotels_response or 'properties' in hotels_response
+    ):
+        return {'data': hotels_response}
+    print("❌ Hotels.com data saknar förväntad struktur")
+    return None
+
+# ==================== HOTELLBEARBETNING ====================
+
+def process_hotels_com_hotels(hotels_data, city_info, checkin, checkout, adults, rooms):
+    processed_hotels = []
+    if not isinstance(hotels_data, dict) or 'data' not in hotels_data:
+        return processed_hotels
+
+    data = hotels_data.get('data')
+    properties = []
+    if isinstance(data, dict):
+        properties = (
+            data.get('propertySearch', {}).get('properties') or
+            data.get('properties') or []
+        )
+    elif isinstance(data, list):
+        properties = data
+
+    for i, hotel in enumerate(properties[:25]):
+        if not isinstance(hotel, dict):
+            continue
+
+        hotel_name = hotel.get('name') or f"Hotel {i+1}"
+        coordinates = city_info.get('coordinates', [0.0, 0.0])
+        lat = (
+            hotel.get('mapMarker', {}).get('latLong', {}).get('lat') or
+            hotel.get('mapMarker', {}).get('latLong', {}).get('latitude') or
+            hotel.get('coordinate', {}).get('lat') or
+            hotel.get('coordinate', {}).get('latitude')
+        )
+        lon = (
+            hotel.get('mapMarker', {}).get('latLong', {}).get('lon') or
+            hotel.get('mapMarker', {}).get('latLong', {}).get('longitude') or
+            hotel.get('coordinate', {}).get('lon') or
+            hotel.get('coordinate', {}).get('longitude')
+        )
+        try:
+            coordinates = [float(lat), float(lon)]
+        except (TypeError, ValueError):
+            pass
+
+        price = hotel.get('price', {}).get('lead', {}).get('amount')
+        try:
+            price = int(price)
+        except (TypeError, ValueError):
+            price = 'N/A'
+
+        rating = hotel.get('reviews', {}).get('score') or hotel.get('guestReviews', {}).get('rating')
+        try:
+            rating = float(rating)
+        except (TypeError, ValueError):
+            rating = 4.0
+
+        property_id = hotel.get('id') or hotel.get('propertyId') or str(i)
+        hotels_url = (
+            f"https://hotels.com/h{property_id}.Hotel-Information?"
+            f"checkIn={checkin}&checkOut={checkout}&rooms[0].adults={adults}&rooms[0].children=0"
+        )
+
+        address = city_info.get('name')
+        neighborhood = hotel.get('neighborhood')
+        if isinstance(neighborhood, dict):
+            address = neighborhood.get('name') or address
+        else:
+            street = hotel.get('address', {}).get('streetAddress')
+            if street:
+                address = street
+
+        processed_hotels.append({
+            'id': f"hotels_{property_id}",
+            'name': hotel_name,
+            'address': address,
+            'coordinates': coordinates,
+            'price': price,
+            'rating': rating,
+            'platform': 'Hotels.com',
+            'platform_logo': '🏛️',
+            'booking_url': hotels_url,
+            'source': 'hotels'
+        })
+
+    return processed_hotels
+
+# ==================== HUVUDFUNKTION ====================
+
+@app.route("/test")
+def get_hotels_multiplatform():
+    try:
+        city_key = request.args.get('city', 'stockholm').lower()
+        city_info = CITIES.get(city_key)
+        if not city_info:
+            return jsonify({'error': 'Ogiltig stad'}), 400
+
+        checkin = request.args.get('checkin', '2025-08-01')
+        checkout = request.args.get('checkout', '2025-08-03')
+        adults = int(request.args.get('adults', 1))
+        rooms = int(request.args.get('rooms', 1))
+
+        hotels_data = fetch_hotels_com_data(city_info, checkin, checkout, adults, rooms)
+        hotels_com_hotels = process_hotels_com_hotels(hotels_data, city_info, checkin, checkout, adults, rooms)
+        sorted_hotels = sorted(hotels_com_hotels, key=lambda h: h.get('rating', 0), reverse=True)
+
+        return jsonify(sorted_hotels)
+
+    except Exception as e:
+        print(f"🔥 get_hotels_multiplatform error: {e}")
+        return jsonify({'error': 'Kunde inte hämta hotellinformationen.'}), 500
